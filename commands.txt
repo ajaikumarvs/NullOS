@@ -1,1 +1,2 @@
 docker run --rm -it -v ${PWD}:/root/env nullos-buildenv - Get into buildenv shell.
+run make build-x86_64 to build the kernel
