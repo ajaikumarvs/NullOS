@@ -38,12 +38,12 @@ jobs:
         sudo make install
         cd ../..
 
-        # Install GCC
+        # Install GCC (only C compiler, skips C++ tools)
         wget http://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
         tar -xvzf gcc-13.2.0.tar.gz
         cd gcc-13.2.0
         mkdir build && cd build
-        ../configure --target=$TARGET --prefix=$PREFIX --disable-nls --enable-languages=c,c++ --without-headers
+        ../configure --target=$TARGET --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers
         make all-gcc -j$(nproc)
         make all-target-libgcc -j$(nproc)
         sudo make install
@@ -54,7 +54,3 @@ jobs:
 
     - name: Verify Kernel ISO
       run: ls -lh dist/x86_64/kernel.iso
-
-    # Optional: Run the kernel in QEMU for automated testing
-    # - name: Test Kernel in QEMU
-    #   run: qemu-system-x86_64 -cdrom dist/x86_64/kernel.iso -nographic -no-reboot -serial stdio
