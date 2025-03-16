@@ -1,0 +1,76 @@
+name: Build NullOS
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Build Docker environment
+      uses: docker/build-push-action@v5
+      with:
+        context: ./buildenv
+        push: false
+        load: true
+        tags: os-buildenv:latest
+        
+    - name: Debug environment
+      run: |
+        echo "Repository contents:"
+        ls -la
+        if [ -f "Makefile" ]; then
+          echo "Makefile content:"
+          cat Makefile
+        else
+          echo "Makefile not found!"
+        fi
+
+    - name: Build kernel
+      run: |
+        # Note: Docker configuration matches your Dockerfile's VOLUME and WORKDIR
+        docker run --rm -v ${{ github.workspace }}:/root/env os-buildenv:latest make
+        
+    - name: Verify build outputs
+      run: |
+        echo "Checking for build artifacts:"
+        find . -name "*.bin" || echo "No .bin files found"
+        find . -name "*.iso" || echo "No .iso files found"
+        
+        if [ -f "dist/x86_64/kernel.bin" ]; then
+          echo "✅ kernel.bin found at expected location"
+        else
+          echo "❌ kernel.bin not found at expected location"
+        fi
+        
+        if [ -f "dist/x86_64/kernel.iso" ]; then
+          echo "✅ kernel.iso found at expected location"
+        else
+          echo "❌ kernel.iso not found at expected location"
+        fi
+        
+    - name: Upload kernel binary
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: kernel-bin
+        path: |
+          **/kernel.bin
+        if-no-files-found: warn
+        
+    - name: Upload ISO
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: os-iso
+        path: |
+          **/kernel.iso
+        if-no-files-found: warn
