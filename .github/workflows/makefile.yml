@@ -2,9 +2,11 @@ name: Makefile CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   build:
@@ -17,9 +19,11 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y nasm grub-pc-bin grub-common qemu-system-x86 build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo
+        sudo apt install -y nasm grub-pc-bin grub-common qemu-system-x86 \
+                            build-essential bison flex libgmp3-dev libmpc-dev \
+                            libmpfr-dev texinfo
 
-    - name: Install x86_64-elf Cross Compiler
+    - name: Install x86_64-elf Cross Compiler (GCC & Binutils)
       run: |
         export PREFIX="/usr/local/cross"
         export TARGET=x86_64-elf
@@ -38,7 +42,7 @@ jobs:
         sudo make install
         cd ../..
 
-        # Install GCC (only C compiler, skips C++ tools)
+        # Install GCC (without C++ tools)
         wget http://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
         tar -xvzf gcc-13.2.0.tar.gz
         cd gcc-13.2.0
@@ -48,6 +52,9 @@ jobs:
         make all-target-libgcc -j$(nproc)
         sudo make install
         cd ../..
+
+    - name: Ensure required directories exist
+      run: mkdir -p dist/x86_64 targets/x86_64/iso/boot
 
     - name: Build Kernel
       run: make build-x86_64
