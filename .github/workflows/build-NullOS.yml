@@ -23,54 +23,76 @@ jobs:
         load: true
         tags: os-buildenv:latest
         
-    - name: Debug environment
+    - name: Debug pre-build environment
       run: |
-        echo "Repository contents:"
-        ls -la
+        echo "Repository structure:"
+        find . -type d | sort
+        
+        echo "Makefile content:"
         if [ -f "Makefile" ]; then
-          echo "Makefile content:"
           cat Makefile
         else
           echo "Makefile not found!"
+          find . -name "Makefile"
         fi
-
-    - name: Build kernel
-      run: |
-        # Note: Docker configuration matches your Dockerfile's VOLUME and WORKDIR
-        docker run --rm -v ${{ github.workspace }}:/root/env os-buildenv:latest make
         
-    - name: Verify build outputs
+        echo "Source files:"
+        find ./src -type f | sort
+
+    - name: Run make with verbose output
       run: |
-        echo "Checking for build artifacts:"
+        # Run make with verbose flag if supported
+        docker run --rm -v ${{ github.workspace }}:/root/env os-buildenv:latest sh -c "cd /root/env && make V=1 || make VERBOSE=1 || make"
+        
+    - name: Debug Docker container environment
+      run: |
+        # Check what the Docker container sees
+        docker run --rm -v ${{ github.workspace }}:/root/env os-buildenv:latest sh -c "cd /root/env && echo 'Container working directory:' && pwd && echo 'Directory contents:' && ls -la"
+        
+    - name: Find all build artifacts
+      run: |
+        echo "All files created/modified in the last 5 minutes:"
+        find . -type f -mmin -5 | grep -v "\.git" || echo "No recently modified files found"
+        
+        echo "All binary files in repository:"
+        find . -type f -name "*.bin" -o -name "*.iso" -o -name "*.o" | sort || echo "No binary files found"
+        
+        echo "Expected output locations:"
+        ls -la dist/x86_64/ || echo "dist/x86_64/ directory doesn't exist or is empty"
+
+    - name: Try direct build commands
+      run: |
+        # If make failed, try running the build commands directly
+        docker run --rm -v ${{ github.workspace }}:/root/env os-buildenv:latest sh -c "cd /root/env && \
+          echo 'Attempting direct build...' && \
+          mkdir -p build/x86_64/boot && \
+          mkdir -p dist/x86_64 && \
+          nasm -f elf64 src/impl/x86_64/boot/header.asm -o build/x86_64/boot/header.o && \
+          nasm -f elf64 src/impl/x86_64/boot/main.asm -o build/x86_64/boot/main.o && \
+          echo 'Object files created:' && \
+          ls -la build/x86_64/boot/ && \
+          x86_64-elf-ld -n -o dist/x86_64/kernel.bin -T targets/x86_64/linked.ld build/x86_64/boot/header.o build/x86_64/boot/main.o && \
+          echo 'Kernel binary created:' && \
+          ls -la dist/x86_64/kernel.bin && \
+          cp dist/x86_64/kernel.bin targets/x86_64/iso/boot/ && \
+          grub-mkrescue /usr/lib/grub/i386-pc -o dist/x86_64/kernel.iso targets/x86_64/iso" || true
+          
+    - name: Final artifact check
+      run: |
+        echo "Final check for build artifacts:"
         find . -name "*.bin" || echo "No .bin files found"
         find . -name "*.iso" || echo "No .iso files found"
         
-        if [ -f "dist/x86_64/kernel.bin" ]; then
-          echo "✅ kernel.bin found at expected location"
-        else
-          echo "❌ kernel.bin not found at expected location"
-        fi
-        
-        if [ -f "dist/x86_64/kernel.iso" ]; then
-          echo "✅ kernel.iso found at expected location"
-        else
-          echo "❌ kernel.iso not found at expected location"
-        fi
-        
-    - name: Upload kernel binary
+    - name: Upload all artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: kernel-bin
+        name: all-build-artifacts
         path: |
           **/kernel.bin
-        if-no-files-found: warn
-        
-    - name: Upload ISO
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: os-iso
-        path: |
           **/kernel.iso
+          **/*.o
+          src/**
+          targets/**
+          Makefile
         if-no-files-found: warn
