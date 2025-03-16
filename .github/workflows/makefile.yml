@@ -17,7 +17,37 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y nasm x86_64-elf-binutils x86_64-elf-gcc grub-pc-bin grub-common qemu-system-x86
+        sudo apt install -y nasm grub-pc-bin grub-common qemu-system-x86 build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo
+
+    - name: Install x86_64-elf Cross Compiler
+      run: |
+        export PREFIX="/usr/local/cross"
+        export TARGET=x86_64-elf
+        export PATH="$PREFIX/bin:$PATH"
+
+        mkdir -p $HOME/src
+        cd $HOME/src
+
+        # Install Binutils
+        wget http://ftp.gnu.org/gnu/binutils/binutils-2.40.tar.gz
+        tar -xvzf binutils-2.40.tar.gz
+        cd binutils-2.40
+        mkdir build && cd build
+        ../configure --target=$TARGET --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
+        make -j$(nproc)
+        sudo make install
+        cd ../..
+
+        # Install GCC
+        wget http://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
+        tar -xvzf gcc-13.2.0.tar.gz
+        cd gcc-13.2.0
+        mkdir build && cd build
+        ../configure --target=$TARGET --prefix=$PREFIX --disable-nls --enable-languages=c,c++ --without-headers
+        make all-gcc -j$(nproc)
+        make all-target-libgcc -j$(nproc)
+        sudo make install
+        cd ../..
 
     - name: Build Kernel
       run: make build-x86_64
