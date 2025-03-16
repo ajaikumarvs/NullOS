@@ -9,6 +9,8 @@ start:
     call check_cpuid
     call check_long_mode
 
+    
+
     ; print 'OK'
     mov dword [0xb8000], 0x2f4b2f4f
     hlt
@@ -18,13 +20,42 @@ check_multiboot:
     jne .no_multiboot
     ret
 .no_multiboot:
-    mov al, "M"
+    mov al, "M" ;error code M for no multiboot
     jmp error
 
 check_cpuid:
     pushfd
     pop eax
     mov ecx, eax
+    xor eax, 1 << 21
+    push eax
+    popfd
+    pushfd
+    pop eax
+    push ecx
+    popfd
+    cmp eax, ecx
+    je .no_cpuid
+    ret
+.no_cpuid:
+    mov al, "C" ;error code C for cpuid
+    jmp error
+
+check_long_mode:
+    mov eax, 0x80000000
+    cpuid
+    cmp eax, 0x80000001
+    jb .no_long_mode
+
+    mov eax, 0x80000001
+    cpuid
+    test edx, 1 << 29
+    jz .no_long_mode
+
+    ret
+.no_long_mode:
+    mov al, "L" ;error code L for no long_mode
+    jmp error
 
 error:
     ; print "ERR:X" where X denotes the error code
