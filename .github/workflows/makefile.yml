@@ -2,42 +2,54 @@ name: Build NullOS
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential nasm xorriso grub-pc-bin grub-common
-
-      - name: Ensure required directories exist
-        run: mkdir -p build/x86_64 dist/x86_64 targets/x86_64/iso/boot
-
-      - name: Compile Assembly Files
-        run: make build-x86_64
-
-      - name: Create Bootable ISO
-        run: |
-          cp dist/x86_64/kernel.bin targets/x86_64/iso/boot/kernel.bin
-          grub-mkrescue -o dist/x86_64/kernel.iso targets/x86_64/iso
-
-      - name: Upload Kernel Binary (Artifact)
-        uses: actions/upload-artifact@v4
-        with:
-          name: NullOS-Kernel
-          path: dist/x86_64/kernel.bin
-
-      - name: Upload ISO Image (Artifact)
-        uses: actions/upload-artifact@v4
-        with:
-          name: NullOS-ISO
-          path: dist/x86_64/kernel.iso
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker environment
+      uses: docker/build-push-action@v5
+      with:
+        context: ./buildenv
+        push: false
+        load: true
+        tags: os-buildenv:latest
+        
+    - name: Build kernel
+      run: |
+        docker run --rm -v ${{ github.workspace }}:/workspace os-buildenv:latest make clean
+        docker run --rm -v ${{ github.workspace }}:/workspace os-buildenv:latest make
+        
+    - name: Upload kernel binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-bin
+        path: dist/x86_64/kernel.bin
+        
+    - name: Upload ISO
+      uses: actions/upload-artifact@v4
+      with:
+        name: os-iso
+        path: dist/x86_64/kernel.iso
+        
+    - name: Test kernel build
+      run: |
+        if [ ! -f dist/x86_64/kernel.bin ]; then
+          echo "Kernel binary was not built successfully"
+          exit 1
+        fi
+        if [ ! -f dist/x86_64/kernel.iso ]; then
+          echo "Kernel ISO was not built successfully"
+          exit 1
+        fi
