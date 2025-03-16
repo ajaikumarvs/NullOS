@@ -1,26 +1,40 @@
-# Find all assembly source files in src/impl/x86_64 directory
-x86_64_asm_source_files := $(shell find src/impl/x86_64 -name "*.asm")
+# Gathering Kernel source files
+kernel_source_files := $(shell find src/impl/kernel -name "*.c")
+kernel_object_files := $(patsubst src/impl/kernel/%.c, build/kernel/%.o, $(kernel_source_files))
 
-# Convert source file paths (src/impl/x86_64/file.asm) into object file paths (build/x86_64/file.o)
+# Gathering x86_64 C source files
+x86_64_c_source_files := $(shell find src/impl/x86_64 -name "*.c")
+x86_64_c_object_files := $(patsubst src/impl/x86_64/%.c, build/x86_64/%.o, $(x86_64_c_source_files))
+
+# Gathering x86_64 Assembly source files
+x86_64_asm_source_files := $(shell find src/impl/x86_64 -name "*.asm")
 x86_64_asm_object_files := $(patsubst src/impl/x86_64/%.asm, build/x86_64/%.o, $(x86_64_asm_source_files))
 
-# Rule to compile each assembly source file into an object file
-$(x86_64_asm_object_files): build/x86_64/%.o : src/impl/x86_64/%.asm
-	# Create the output directory if it doesn't exist
-	mkdir -p $(dir $@)
-	# Assemble the .asm file into an ELF64 object file
-	nasm -f elf64 $< -o $@
+# All x86_64 object files
+x86_64_object_files := $(x86_64_c_object_files) $(x86_64_asm_object_files)
 
-# Declare "build-x86_64" as a phony target (not an actual file)
+# Marking build-x86_64 as a phony target
 .PHONY: build-x86_64
 
+# Rule to compile each C source file in x86_64
+build/x86_64/%.o: src/impl/x86_64/%.c
+	@mkdir -p $(dir $@)
+	x86_64-elf-gcc -c -I src/intf -ffreestanding $< -o $@
+
+# Rule to compile each Kernel source file
+build/kernel/%.o: src/impl/kernel/%.c
+	@mkdir -p $(dir $@)
+	x86_64-elf-gcc -c -I src/intf -ffreestanding $< -o $@
+
+# Rule to assemble each assembly source file
+build/x86_64/%.o: src/impl/x86_64/%.asm
+	@mkdir -p $(dir $@)
+	nasm -f elf64 $< -o $@
+
 # Rule to build the x86_64 kernel
-build-x86_64: $(x86_64_asm_object_files)
-	# Ensure the dist directory exists
+build-x86_64: $(kernel_object_files) $(x86_64_object_files)
+	@echo "Building kernel..."
 	mkdir -p dist/x86_64
-	# Link all compiled object files into a kernel binary
-	x86_64-elf-ld -n -o dist/x86_64/kernel.bin -T targets/x86_64/linked.ld $(x86_64_asm_object_files)
-	# Copy the compiled kernel binary to the GRUB bootable ISO directory
+	x86_64-elf-ld -n -o dist/x86_64/kernel.bin -T targets/x86_64/linked.ld $(kernel_object_files) $(x86_64_object_files)
 	cp dist/x86_64/kernel.bin targets/x86_64/iso/boot/kernel.bin
-	# Create a bootable ISO using GRUB2
 	grub-mkrescue -o dist/x86_64/kernel.iso targets/x86_64/iso
