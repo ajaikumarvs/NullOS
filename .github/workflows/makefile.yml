@@ -1,63 +1,43 @@
-name: Makefile CI
+name: Build NullOS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y nasm grub-pc-bin grub-common qemu-system-x86 \
-                            build-essential bison flex libgmp3-dev libmpc-dev \
-                            libmpfr-dev texinfo
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential nasm xorriso grub-pc-bin grub-common
 
-    - name: Install x86_64-elf Cross Compiler (GCC & Binutils)
-      run: |
-        export PREFIX="/usr/local/cross"
-        export TARGET=x86_64-elf
-        export PATH="$PREFIX/bin:$PATH"
+      - name: Ensure required directories exist
+        run: mkdir -p build/x86_64 dist/x86_64 targets/x86_64/iso/boot
 
-        mkdir -p $HOME/src
-        cd $HOME/src
+      - name: Compile Assembly Files
+        run: make build-x86_64
 
-        # Install Binutils
-        wget http://ftp.gnu.org/gnu/binutils/binutils-2.40.tar.gz
-        tar -xvzf binutils-2.40.tar.gz
-        cd binutils-2.40
-        mkdir build && cd build
-        ../configure --target=$TARGET --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
-        make -j$(nproc)
-        sudo make install
-        cd ../..
+      - name: Create Bootable ISO
+        run: |
+          cp dist/x86_64/kernel.bin targets/x86_64/iso/boot/kernel.bin
+          grub-mkrescue -o dist/x86_64/kernel.iso targets/x86_64/iso
 
-        # Install GCC (without C++ tools)
-        wget http://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.gz
-        tar -xvzf gcc-13.2.0.tar.gz
-        cd gcc-13.2.0
-        mkdir build && cd build
-        ../configure --target=$TARGET --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers
-        make all-gcc -j$(nproc)
-        make all-target-libgcc -j$(nproc)
-        sudo make install
-        cd ../..
+      - name: Upload Kernel Binary (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: NullOS-Kernel
+          path: dist/x86_64/kernel.bin
 
-    - name: Ensure required directories exist
-      run: mkdir -p dist/x86_64 targets/x86_64/iso/boot
-
-    - name: Build Kernel
-      run: make build-x86_64
-
-    - name: Verify Kernel ISO
-      run: ls -lh dist/x86_64/kernel.iso
+      - name: Upload ISO Image (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: NullOS-ISO
+          path: dist/x86_64/kernel.iso
