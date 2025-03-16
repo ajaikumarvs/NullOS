@@ -1,1 +1,41 @@
-#Fresh start using Rust
+# Ignore the target directory (build output)
+target/
+
+# Ignore build artifacts and intermediate files
+**/*.rlib
+**/*.rmeta
+**/*.o
+**/*.d
+**/*.so
+**/*.dSYM/
+**/*.out
+**/*.a
+
+# Ignore Cargo.lock if you're developing a library
+Cargo.lock
+
+# Ignore editor and IDE files
+.vscode/
+
+# Ignore logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Ignore Rust debug/test output
+debug/
+bench/
+tests/
+
+# Ignore disk images and ISO files for the OS
+*.iso
+*.img
+*.bin
+
+# Ignore Cargo build script outputs
+build.rs
+
+# Ignore cross-compilation artifacts
+.xbuild/
+cargo-xbuild/
