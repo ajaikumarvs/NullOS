@@ -53,7 +53,9 @@ jobs:
           
     - name: Build kernel
       run: |
-        docker run --rm -v ${{ github.workspace }}:/workspace os-buildenv:latest make clean
+        # Manually clean build and dist directories if needed
+        docker run --rm -v ${{ github.workspace }}:/workspace os-buildenv:latest sh -c "rm -rf /workspace/build/x86_64/* /workspace/dist/x86_64/*"
+        # Run make to build the project
         docker run --rm -v ${{ github.workspace }}:/workspace os-buildenv:latest make
         
     - name: Upload kernel binary
