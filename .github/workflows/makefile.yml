@@ -15,6 +15,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Debug workspace
+      run: |
+        echo "Current directory: $(pwd)"
+        ls -la
+        echo "Checking for Makefile:"
+        if [ -f "Makefile" ]; then
+          echo "Makefile found at repository root"
+          cat Makefile | head -n 10
+        else
+          echo "Makefile not found at repository root"
+          find . -name "Makefile" -type f
+        fi
+        
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       
@@ -51,12 +64,16 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-build-
           
+    - name: Debug Docker container
+      run: |
+        docker run --rm -v ${{ github.workspace }}:/workspace os-buildenv:latest sh -c "ls -la /workspace && echo 'Docker working directory:' && pwd"
+        
     - name: Build kernel
       run: |
         # Manually clean build and dist directories if needed
         docker run --rm -v ${{ github.workspace }}:/workspace os-buildenv:latest sh -c "rm -rf /workspace/build/x86_64/* /workspace/dist/x86_64/*"
-        # Run make to build the project
-        docker run --rm -v ${{ github.workspace }}:/workspace os-buildenv:latest make
+        # Run make to build the project with explicit Makefile path
+        docker run --rm -v ${{ github.workspace }}:/workspace os-buildenv:latest sh -c "cd /workspace && make"
         
     - name: Upload kernel binary
       uses: actions/upload-artifact@v4
